@@ -1,24 +1,28 @@
 import argparse
 import json
+import os
 import time
-import uuid
 from pathlib import Path
 
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
 from numpy import random
+from threading import Thread
 
 import camera
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages
 from utils.general import check_img_size, non_max_suppression, apply_classifier, scale_coords, xyxy2xywh, \
     strip_optimizer, set_logging, increment_path
+from utils.mqtt import start_mqtt
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 
+from scale import scaling, create_polygons, polygons_intersection
 
-def detect(save_img=False):
+
+def detect():
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
@@ -46,12 +50,19 @@ def detect(save_img=False):
 
     # Set Dataloader
     vid_path, vid_writer = None, None
-    if webcam:
+
+    '''if webcam:
         view_img = True
+        save_img = True
         cudnn.benchmark = True  # set True to speed up constant image size inference
         dataset = LoadStreams(source, img_size=imgsz)
+       else:
+    '''
+    save_img = False
+    view_img = True
+    if webcam:
+        dataset = LoadStreams(source, img_size=imgsz)
     else:
-        save_img = True
         dataset = LoadImages(source, img_size=imgsz)
 
     # Get names and colors
@@ -88,10 +99,14 @@ def detect(save_img=False):
             else:
                 p, s, im0 = Path(path), '', im0s
 
+            im0 = cv2.resize(im0, (640, 480))
             save_path = str(save_dir / p.name)
             txt_path = str(save_dir / 'labels' / p.stem) + ('_%g' % dataset.frame if dataset.mode == 'video' else '')
-            s += '%gx%g ' % img.shape[2:]  # print string
+            s += '%gx%g ' % img.shape[2:]  # print strings
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            x_frame, y_frame = im0.shape[:2]
+
+            polygons = create_polygons(filename, x_frame, y_frame)
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -112,33 +127,34 @@ def detect(save_img=False):
                     if save_img or view_img:  # Add bbox to image
                         label = '%s %.2f' % (names[int(cls)], conf)
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
+                        polygons_intersection(xyxy, polygons, im0)
 
             # Print time (inference + NMS)
             print('%sDone. (%.3fs)' % (s, t2 - t1))
 
+            with open(filename, 'r+') as json_file:
+                data = json.load(json_file)
+
+            for area in data:
+                tops = data[area]['tops']
+                for i in range(len(tops)):
+                    if i == tops.index(tops[-1]):
+                        cv2.line(im0, scaling(x_frame, y_frame, tops[i]), scaling(x_frame, y_frame, tops[0]),
+                                 (0, 0, 255), 2)
+                    else:
+                        cv2.line(im0, scaling(x_frame, y_frame, tops[i]), scaling(x_frame, y_frame, tops[i + 1]),
+                                 (0, 0, 255), 2)
+
             # Stream results
             if view_img:
-                x_frame, y_frame = im0.shape[:2]
+                cv2.imshow('inter', im0)
 
-                with open(filename, 'r+') as json_file:
-                    data = json.load(json_file)
-
-                for area in data:
-                    tops = data[area]['tops']
-                    for i in range(len(tops)):
-                        if i == tops.index(tops[-1]):
-                            cv2.line(im0, (int(tops[i][0] * x_frame), int(tops[i][1] * y_frame)),
-                                     (int(tops[0][0] * x_frame), int(tops[0][1] * y_frame)), (0, 0, 255), 2)
-                        else:
-                            cv2.line(im0, (int(tops[i][0] * x_frame), int(tops[i][1] * y_frame)),
-                                     (int(tops[i + 1][0] * x_frame), int(tops[i + 1][1] * y_frame)), (0, 0, 255), 2)
-                cv2.imshow(str(p), im0)
-                if cv2.waitKey(1) == ord('q'):  # q to quit
+                if cv2.waitKey(1) == ord('q'):
                     raise StopIteration
 
             # Save results (image with detections)
             if save_img:
-                if dataset.mode == 'images':
+                if dataset.mode == 'images' and not webcam:
                     cv2.imwrite(save_path, im0)
                 else:
                     if vid_path != save_path:  # new video
@@ -150,6 +166,8 @@ def detect(save_img=False):
                         fps = vid_cap.get(cv2.CAP_PROP_FPS)
                         w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                         h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        if webcam:
+                            save_path = save_path + '_camera.mp4'
                         vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*fourcc), fps, (w, h))
                     vid_writer.write(im0)
 
@@ -181,26 +199,36 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     with torch.no_grad():
+        filename = 'config.json'
+
+        if opt.source.isnumeric():
+            cap = cv2.VideoCapture(int(opt.source))
+        else:
+            print(opt.source)
+            cap = cv2.VideoCapture(opt.source)
+
+        _, setting_frame = cap.read()
+
+        setting_frame = cv2.resize(setting_frame, (640, 480))
+        with open(filename, 'w') as json_file:
+            json.dump({}, json_file, indent=4)
+
+        while True:
+            cv2.imshow("Settings", setting_frame)
+            cv2.setMouseCallback("Settings", camera.create_area, setting_frame)
+            if cv2.waitKey(1) & 0xFF == 13:
+                break
+
+        cv2.destroyAllWindows()
+        cap.release()
+
+        # start mqtt
+        # mqtt_client = Thread(target=start_mqtt)
+        # mqtt_client.start()
+
         if opt.update:  # update all models (to fix SourceChangeWarning)
             for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
                 detect()
                 strip_optimizer(opt.weights)
         else:
-            filename = 'config.json'
-
-            cap = cv2.VideoCapture(0)
-            _, setting_frame = cap.read()
-
-            with open(filename, 'w') as json_file:
-                json.dump({}, json_file, indent=4)
-
-            while True:
-                cv2.imshow("0", setting_frame)
-                cv2.setMouseCallback("0", camera.create_area, setting_frame)
-                if cv2.waitKey(1) & 0xFF == 13:
-                    break
-
-            cv2.destroyAllWindows()
-            cap.release()
-
             detect()

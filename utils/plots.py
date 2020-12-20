@@ -23,6 +23,8 @@ from utils.metrics import fitness
 matplotlib.rc('font', **{'size': 11})
 matplotlib.use('Agg')  # for writing to files only
 
+vector_stack = []
+
 
 def color_list():
     # Return first 10 plt colors as (r,g,b) https://stackoverflow.com/questions/51350872/python-from-color-name-to-rgb
@@ -54,10 +56,22 @@ def butter_lowpass_filtfilt(data, cutoff=1500, fs=50000, order=5):
 
 def plot_one_box(x, img, color=None, label=None, line_thickness=None):
     # Plots one bounding box on image img
+    global vector_stack
+
+    xywh = (xyxy2xywh(torch.tensor(x).view(1, 4))).view(-1).tolist()[:2]
+
     tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
     color = color or [random.randint(0, 255) for _ in range(3)]
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    if len(vector_stack) == 10:
+        # length = (vector_stack[-1][0] - vector_stack[0][0], vector_stack[-1][1], vector_stack[0][1])
+        cv2.arrowedLine(img, vector_stack[0], vector_stack[-1], (255, 255, 255), 4)
+        # cv2.arrowedLine(img, (int(xywh[0]), int(xywh[1])),
+        #                (vector_stack[-1][0] + length[0], vector_stack[-1][1] + length[1]), (255, 255, 255), 4)
+        vector_stack.pop(0)
+    else:
+        vector_stack.append((int(xywh[0]), int(xywh[1])))
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
