@@ -99,7 +99,8 @@ def detect():
             else:
                 p, s, im0 = Path(path), '', im0s
 
-            im0 = cv2.resize(im0, (640, 480))
+            if view_img:
+                im0 = cv2.resize(im0, (int(1080 // 1.5), int(720 // 1.5)))
             save_path = str(save_dir / p.name)
             txt_path = str(save_dir / 'labels' / p.stem) + ('_%g' % dataset.frame if dataset.mode == 'video' else '')
             s += '%gx%g ' % img.shape[2:]  # print strings
@@ -138,12 +139,8 @@ def detect():
             for area in data:
                 tops = data[area]['tops']
                 for i in range(len(tops)):
-                    if i == tops.index(tops[-1]):
-                        cv2.line(im0, scaling(x_frame, y_frame, tops[i]), scaling(x_frame, y_frame, tops[0]),
-                                 (0, 0, 255), 2)
-                    else:
-                        cv2.line(im0, scaling(x_frame, y_frame, tops[i]), scaling(x_frame, y_frame, tops[i + 1]),
-                                 (0, 0, 255), 2)
+                    cv2.line(im0, scaling(x_frame, y_frame, tops[i % len(tops)]), scaling(x_frame, y_frame, tops[(i + 1) % len(tops)]),
+                             (0, 0, 255), 2)
 
             # Stream results
             if view_img:
@@ -204,12 +201,11 @@ if __name__ == '__main__':
         if opt.source.isnumeric():
             cap = cv2.VideoCapture(int(opt.source))
         else:
-            print(opt.source)
             cap = cv2.VideoCapture(opt.source)
 
         _, setting_frame = cap.read()
 
-        setting_frame = cv2.resize(setting_frame, (640, 480))
+        setting_frame = cv2.resize(setting_frame, (int(1080 // 1.5), int(720 // 1.5)))
         with open(filename, 'w') as json_file:
             json.dump({}, json_file, indent=4)
 
