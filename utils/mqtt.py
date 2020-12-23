@@ -6,7 +6,7 @@ import uvloop
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-host = '192.168.1.109'
+host = 'dev.starlight.group'
 
 
 def on_connect(client, flags, rc, properties):

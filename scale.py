@@ -11,8 +11,8 @@ check = False
 
 broker_port = 1883
 
-username = ''
-password = ''
+username = 'testuser'
+password = 'P@ssw0rd'
 
 client = mqtt.Client()
 client.username_pw_set(username)

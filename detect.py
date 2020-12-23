@@ -58,8 +58,8 @@ def detect():
         dataset = LoadStreams(source, img_size=imgsz)
        else:
     '''
-    save_img = False
-    view_img = True
+    save_img = True
+    view_img = False
     if webcam:
         dataset = LoadStreams(source, img_size=imgsz)
     else:
@@ -160,7 +160,8 @@ def detect():
                             vid_writer.release()  # release previous video writer
 
                         fourcc = 'mp4v'  # output video codec
-                        fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                        fps = 30.0
+                        print(fps)
                         w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                         h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                         if webcam:
