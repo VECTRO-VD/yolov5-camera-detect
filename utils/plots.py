@@ -58,12 +58,13 @@ def plot_one_box(x, img, color=None, label=None, line_thickness=None):
     # Plots one bounding box on image img
     global vector_stack
 
-    xy = (xyxy2xywh(torch.tensor(x).view(1, 4))).view(-1).tolist()[:2]
+    # xy = (xyxy2xywh(torch.tensor(x).view(1, 4))).view(-1).tolist()[:2]
 
     tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
     color = color or [random.randint(0, 255) for _ in range(3)]
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    '''
     if len(vector_stack) == 10:
         # length = (vector_stack[-1][0] - vector_stack[0][0], vector_stack[-1][1], vector_stack[0][1])
         cv2.arrowedLine(img, vector_stack[0], vector_stack[-1], (255, 255, 255), 4)
@@ -71,7 +72,7 @@ def plot_one_box(x, img, color=None, label=None, line_thickness=None):
         #                (vector_stack[-1][0] + length[0], vector_stack[-1][1] + length[1]), (255, 255, 255), 4)
         vector_stack.pop(0)
     else:
-        vector_stack.append((int(xy[0]), int(x[3])))
+        vector_stack.append((int(xy[0]), int(x[3])))'''
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]

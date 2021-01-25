@@ -84,7 +84,7 @@ $ python detect.py --source 0  # webcam
 
 To run inference on example images in `data/images`:
 ```bash
-$ python detect.py --source data/images --weights yolov5s.pt --conf 0.25
+$ python detect.py --source data/images/video.mp4 --weights yolov5s.pt --conf 0.25 --classes 0
 
 Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.25, device='', img_size=640, iou_thres=0.45, save_conf=False, save_dir='runs/detect', save_txt=False, source='data/images/', update=False, view_img=False, weights=['yolov5s.pt'])
 Using torch 1.7.0+cu101 CUDA:0 (Tesla V100-SXM2-16GB, 16130MB)

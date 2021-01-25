@@ -51,24 +51,13 @@ def polygons_intersection(xyxy, polygons, img):
     x, y, x2, y2 = [int(i) for i in xyxy]
     person = Polygon([(x, y), (x2, y), (x2, y2), (x, y2)])
     legs_dot = (x2 - int((x2 - x) / 2), y2 + 2)
-    cv2.circle(img, legs_dot, 2, (255, 0, 255), 3)
+    cv2.circle(img, legs_dot, 2, (255, 0, 255), 2)
 
     for polygon in polygons:
-        if not Point(legs_dot).within(polygon):
+        if Point(legs_dot).within(polygon):
             if polygon.intersects(person):
                 inter = polygon.intersection(person)
                 if type(inter) == Polygon:
-                    cords = [(int(xy[0]), int(xy[1])) for xy in list(inter.exterior.coords)]
-                    if not check:
-                        client.publish('lamp/system', '1')
-                        check = True
-                        print(check)
-                    # for i in range(len(cords) - 1):  # draw intersection
-                    # cv2.line(img, cords[i], cords[i + 1], (0, 255, 255), 5)
-                    cv2.fillPoly(img, np.array([cords], dtype=np.int64), (255, 0, 255))
+                    cords = [(int(xy[0]), int(xy[1])) for xy in list(polygon.exterior.coords)]
+                    cv2.fillPoly(img, np.array([cords], dtype=np.int64), (255, 255, 255))
                     cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
-        else:
-            if check:
-                client.publish('lamp/system', '0')
-                check = False
-                print(check)
